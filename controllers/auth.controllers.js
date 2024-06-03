@@ -1,8 +1,8 @@
-import bcryptjs from "bcryptjs";
-import User from "../models/user.js";
-import createJwtAndSendCookie from "../utils/jwtAuth.js";
+import bcrypt from "bcryptjs";
+import User from "../models/user.model.js";
+import createJwtAndSendCookie from "../utils/jwt.auth.js";
 
-const signup = async (req, res) => {
+export const signup = async (req, res) => {
     try {
         const { name, username, password, confirmPassword, gender } = req.body;
 
@@ -18,8 +18,8 @@ const signup = async (req, res) => {
         });
 
         // Hash password
-        const salt = await bcryptjs.genSalt(10);
-        const hashedPassword = await bcryptjs.hash(password, salt);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
         // generating profilePicture
         const maleProfilePicture = `https://avatar.iran.liara.run/public/boy?username=${username}`;
@@ -31,24 +31,33 @@ const signup = async (req, res) => {
             password: hashedPassword,
             gender,
             profilePicture: (gender === 'male') ? maleProfilePicture : femaleProfilePicture,
-        })
+        });
 
         if (newUser) return res.status(201).json({
             success: true,
-            message: "User registered successfully",
+            message: "Registered successfully",
             name: newUser.name,
             username: newUser.username,
-            password: newUser.password,
             gender: newUser.gender,
             profilePicture: newUser.profilePicture,
-        })
+        });
+        else {
+            return res.status(400).json({
+                success: true,
+                error: "Invalid user data",
+            });
+        }
     } catch (error) {
-        console.log("Error:", error.message);
+        console.log("Error in signup controller:", error.message);
+        res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        });
     }
 
 }
 
-const login = async (req, res) => {
+export const login = async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
@@ -58,36 +67,46 @@ const login = async (req, res) => {
         })
 
         // comparing password
-        const matchPassword = await bcryptjs.compare(password, user.password);
-        if (!matchPassword) return res.status(400).json({
+        const isPasswordMatched = await bcrypt.compare(password, user.password);
+        if (!isPasswordMatched) return res.status(400).json({
             success: false,
             error: "Incorrect password",
         })
 
         createJwtAndSendCookie(user._id, res);
 
-        res.user = user;
         return res.status(200).json({
             success: true,
-            message: "User logged in successfully",
+            message: "Logged in successfully",
+            name: user.name,
+            username: user.username,
+            gender: user.gender,
+            profilePicture: user.profilePicture,
         });
 
     } catch (error) {
-        console.log("Error:", error.message);
+        console.log("Error in login controller:", error.message);
+        res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        });
     }
 }
 
-const logout = async (req, res) => {
+export const logout = (req, res) => {
     try {
         res.cookie("jwt", null, {
             maxAge: 0,
         }).status(200).json({
             success: true,
-            message: "User logged out successfully",
+            message: "Logged out successfully",
         })
     } catch (error) {
-        console.log('Error:', error.message);
+        console.log('Error in logout controller:', error.message);
+        res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        })
     }
 }
 
-export { signup, login, logout };
